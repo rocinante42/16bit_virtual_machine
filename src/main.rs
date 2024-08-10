@@ -1,6 +1,9 @@
-fn main() {
+fn main() -> Result<(), String> {
     let mut machine = Machine::new();
-    machine.step().unwrap();
+    machine.memory.write(0, 0xff);
+    machine.step()?;
+    machine.step()?;
+    Ok(())
 }
 
 // ---------------------------------------------------------------------//
@@ -14,6 +17,13 @@ enum Register {
     PC,
     BP,
     FLAGS,
+}
+
+pub enum Op {
+    Nop,
+    Push(u8),
+    PopReg(Register),
+    AddStack,
 }
 
 trait Addressable {
@@ -83,7 +93,7 @@ impl Addressable for LinearMemory {
 
 struct Machine {
     registers: [u16; 8],
-    memory: LinearMemory,
+    pub memory: LinearMemory,
 }
 
 impl Machine {
@@ -94,10 +104,21 @@ impl Machine {
         }
     }
 
-    pub fn step(&mut self) -> Result<(), &'static str> {
+    pub fn step(&mut self) -> Result<(), String> {
         let pc = self.registers[Register::PC as usize];
         let instruction = self.memory.read2(pc).unwrap();
-        println!("{} @ {}", instruction, pc);
-        Ok(())
+
+        self.registers[Register::PC as usize] = pc + 2;
+
+        // instruction = [ 0 0 0 0 0 0 0 0 | 0 0 0 0 0 0 0 0]
+        //                      OPERATOR   | ARG(s)
+        //                                 | 8 bit literal
+        //                                 | REG1 | REG2
+        //
+        let op = (instruction & 0xff) as u8;
+        match op {
+            x if x == Op::Nop as u8 => Ok(()),
+            _ => Err(format!("unknown operator 0x{:X}", op)),
+        }
     }
 }
